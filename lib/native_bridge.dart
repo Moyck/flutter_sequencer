@@ -89,6 +89,10 @@ class NativeBridge {
     await _channel.invokeMethod('setupAssetManager');
     nRegisterPostCObject(NativeApi.postCObject);
 
+    if (Platform.isAndroid) {
+      return singleResponseFuture<int>((port) => nSetupEngine(port.nativePort));
+    }
+
     return singleResponseFuture<int>((port) async {
       final args = <String, dynamic>{
         'sampleRateCallbackPort': port.nativePort,
@@ -120,6 +124,12 @@ class NativeBridge {
 
   static Future<int> addTrackSf2(
       String filename, bool isAsset, int patchNumber) {
+    if (Platform.isAndroid) {
+      final filenameUtf8Ptr = filename.toNativeUtf8();
+      return singleResponseFuture<int>((port) => nAddTrackSf2(
+          filenameUtf8Ptr, isAsset ? 1 : 0, patchNumber, port.nativePort));
+    }
+
     return singleResponseFuture<int>((port) async {
       final args = <String, dynamic> {
         'path': filename,
@@ -132,6 +142,15 @@ class NativeBridge {
   }
 
   static Future<int> addTrackSfz(String sfzPath, String? tuningPath) {
+    if (Platform.isAndroid) {
+      final sfzPathUtf8Ptr = sfzPath.toNativeUtf8();
+      final tuningPathUtf8Ptr =
+          tuningPath?.toNativeUtf8() ?? Pointer.fromAddress(0);
+
+      return singleResponseFuture<int>((port) =>
+          nAddTrackSfz(sfzPathUtf8Ptr, tuningPathUtf8Ptr, port.nativePort));
+    }
+
     return singleResponseFuture<int>((port) async {
         final args = <String, dynamic> {
           'sfzPath': sfzPath,
@@ -144,6 +163,19 @@ class NativeBridge {
 
   static Future<int> addTrackSfzString(
       String sampleRoot, String sfzContent, String? tuningString) {
+    if (Platform.isAndroid) {
+      final sampleRootUtf8Ptr = sampleRoot.toNativeUtf8();
+      final sfzContentUtf8Ptr = sfzContent.toNativeUtf8();
+      final tuningStringUtf8Ptr =
+          tuningString?.toNativeUtf8() ?? Pointer.fromAddress(0);
+
+      return singleResponseFuture<int>((port) => nAddTrackSfzString(
+          sampleRootUtf8Ptr,
+          sfzContentUtf8Ptr,
+          tuningStringUtf8Ptr,
+          port.nativePort));
+    }
+
     return singleResponseFuture<int>((port) async {
       final args = <String, dynamic> {
         'sampleRoot': sampleRoot,
@@ -166,10 +198,14 @@ class NativeBridge {
   }
 
   static void removeTrack(int trackIndex) {
-    nRemoveTrack(trackIndex);
+    Platform.isAndroid ? nRemoveTrack(trackIndex) : nRemoveTrack(trackIndex);
   }
 
   static void resetTrack(int trackIndex) {
+    if (Platform.isAndroid) {
+      return nResetTrack(trackIndex);
+    }
+
     final args = <String, dynamic> {
       'trackIndex': trackIndex,
     };
@@ -177,10 +213,14 @@ class NativeBridge {
   }
 
   static Future<int> getPosition() async {
-    return await _channel.invokeMethod('getPosition');
+    return Platform.isAndroid ? nGetPosition() : await _channel.invokeMethod('getPosition');
   }
 
   static Future<double> getTrackVolume(int trackIndex) async {
+    if (Platform.isAndroid) {
+      return nGetTrackVolume(trackIndex);
+    }
+
     final args = <String, dynamic>{
       'trackIndex': trackIndex,
     };
@@ -188,10 +228,18 @@ class NativeBridge {
   }
 
   static Future<int> getLastRenderTimeUs() async {
+    if (Platform.isAndroid) {
+      return nGetLastRenderTimeUs();
+    }
+
     return await _channel.invokeMethod('getLastRenderTimeUs');
   }
 
   static Future<int> getBufferAvailableCount(int trackIndex) async {
+    if (Platform.isAndroid) {
+      return nGetBufferAvailableCount(trackIndex);
+    }
+
     final args = <String, dynamic> {
       'trackIndex': trackIndex,
     };
@@ -201,6 +249,19 @@ class NativeBridge {
   static Future<int> handleEventsNow(int trackIndex, List<SchedulerEvent> events,
       int sampleRate, double tempo) async {
     if (events.isEmpty) return 0;
+
+    if (Platform.isAndroid) {
+      final Pointer<Uint8>? nativeArray =
+          calloc<Uint8>(events.length * SCHEDULER_EVENT_SIZE);
+      events.asMap().forEach((eventIndex, e) {
+        final byteData = e.serializeBytes(sampleRate, tempo, 0);
+        for (var byteIndex = 0; byteIndex < byteData.lengthInBytes; byteIndex++) {
+          nativeArray![eventIndex * SCHEDULER_EVENT_SIZE + byteIndex] =
+              byteData.getUint8(byteIndex);
+        }
+      });
+      return nHandleEventsNow(trackIndex, nativeArray, events.length);
+    }
 
     final Uint8List eventData = Uint8List(events.length * SCHEDULER_EVENT_SIZE);
     events.asMap().forEach((eventIndex, e) {
@@ -224,15 +285,19 @@ class NativeBridge {
       int sampleRate, double tempo, int frameOffset) async {
     if (events.isEmpty) return 0;
 
-    final Pointer<Uint8>? nativeArray =
-        calloc<Uint8>(events.length * SCHEDULER_EVENT_SIZE);
-    events.asMap().forEach((eventIndex, e) {
-      final byteData = e.serializeBytes(sampleRate, tempo, frameOffset);
-      for (var byteIndex = 0; byteIndex < byteData.lengthInBytes; byteIndex++) {
-        nativeArray![eventIndex * SCHEDULER_EVENT_SIZE + byteIndex] =
-            byteData.getUint8(byteIndex);
-      }
-    });
+    if (Platform.isAndroid) {
+      final Pointer<Uint8>? nativeArray =
+          calloc<Uint8>(events.length * SCHEDULER_EVENT_SIZE);
+      events.asMap().forEach((eventIndex, e) {
+        final byteData = e.serializeBytes(sampleRate, tempo, frameOffset);
+        for (var byteIndex = 0; byteIndex < byteData.lengthInBytes; byteIndex++) {
+          nativeArray![eventIndex * SCHEDULER_EVENT_SIZE + byteIndex] =
+              byteData.getUint8(byteIndex);
+        }
+      });
+      return nScheduleEvents(trackIndex, nativeArray, events.length);
+    }
+
     final Uint8List eventData = Uint8List(events.length * SCHEDULER_EVENT_SIZE);
     events.asMap().forEach((eventIndex, e) {
       final byteData = e.serializeBytes(sampleRate, tempo, frameOffset);
@@ -251,6 +316,10 @@ class NativeBridge {
   }
 
   static void clearEvents(int trackIndex, int fromTick) {
+    if (Platform.isAndroid) {
+      return nClearEvents(trackIndex, fromTick);
+    }
+
     final args = <String, dynamic>{
       'trackIndex': trackIndex,
       'fromFrame': fromTick,
@@ -259,10 +328,10 @@ class NativeBridge {
   }
 
   static void play() {
-    _channel.invokeMethod('enginePlay');
+    Platform.isAndroid ? nPlay() : _channel.invokeMethod('enginePlay');
   }
 
   static void pause() {
-    _channel.invokeMethod('enginePause');
+    Platform.isAndroid ? nPause() : _channel.invokeMethod('enginePause');
   }
 }
