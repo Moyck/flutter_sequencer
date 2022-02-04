@@ -84,8 +84,8 @@ class Track {
 
   /// Handles a Note On event on this track immediately.
   /// The event will not be added to this track's events.
-  void startNoteNow({required int noteNumber, required double velocity}) {
-    final nextBeat = sequence.getBeat();
+  void startNoteNow({required int noteNumber, required double velocity}) async {
+    final nextBeat = await sequence.getBeat();
     final event = MidiEvent.ofNoteOn(
         beat: nextBeat,
         noteNumber: noteNumber,
@@ -97,8 +97,8 @@ class Track {
 
   /// Handles a Note Off event on this track immediately.
   /// The event will not be added to this track's events.
-  void stopNoteNow({required int noteNumber}) {
-    final nextBeat = sequence.getBeat();
+  void stopNoteNow({required int noteNumber}) async {
+    final nextBeat = await sequence.getBeat();
     final event = MidiEvent.ofNoteOff(beat: nextBeat, noteNumber: noteNumber);
 
     NativeBridge.handleEventsNow(
@@ -107,8 +107,8 @@ class Track {
 
   /// Handles a MIDI CC event on this track immediately.
   /// The event will not be added to this track's events.
-  void midiCCNow({required int ccNumber, required int ccValue}) {
-    final nextBeat = sequence.getBeat();
+  void midiCCNow({required int ccNumber, required int ccValue}) async {
+    final nextBeat = await sequence.getBeat();
     final event =
         MidiEvent.cc(beat: nextBeat, ccNumber: ccNumber, ccValue: ccValue);
 
@@ -118,8 +118,8 @@ class Track {
 
   /// Handles a MIDI pitch bend event on this track immediately.
   /// The event will not be added to this track's events.
-  void midiPitchBendNow({required double value}) {
-    final nextBeat = sequence.getBeat();
+  void midiPitchBendNow({required double value}) async {
+    final nextBeat = await sequence.getBeat();
     final event = MidiEvent.pitchBend(beat: nextBeat, value: value);
 
     NativeBridge.handleEventsNow(
@@ -128,8 +128,8 @@ class Track {
 
   /// Handles a Volume Change event on this track immediately.
   /// The event will not be added to this track's events.
-  void changeVolumeNow({required double volume}) {
-    final nextBeat = sequence.getBeat();
+  void changeVolumeNow({required double volume}) async {
+    final nextBeat = await sequence.getBeat();
     final event = VolumeEvent(beat: nextBeat, volume: volume);
 
     NativeBridge.handleEventsNow(
@@ -211,8 +211,8 @@ class Track {
   }
 
   /// Gets the current volume of the track.
-  double getVolume() {
-    return NativeBridge.getTrackVolume(id);
+  Future<double> getVolume() async {
+    return await NativeBridge.getTrackVolume(id);
   }
 
   /// Clears all events on this track.
@@ -224,8 +224,8 @@ class Track {
   /// Syncs events to the backend. This should be called after making changes to
   /// track events to ensure that the changes are synced immediately.
   void syncBuffer(
-      [int? absoluteStartFrame, int maxEventsToSync = BUFFER_SIZE]) {
-    final position = NativeBridge.getPosition();
+      [int? absoluteStartFrame, int maxEventsToSync = BUFFER_SIZE]) async {
+    final position = await NativeBridge.getPosition();
 
     if (absoluteStartFrame == null) {
       absoluteStartFrame = position;
@@ -246,8 +246,8 @@ class Track {
   /// {@macro flutter_sequencer_library_private}
   /// Triggers a sync that will fill any available space in the buffer with
   /// any un-synced events.
-  void topOffBuffer() {
-    final bufferAvailableCount = NativeBridge.getBufferAvailableCount(id);
+  void topOffBuffer() async {
+    final bufferAvailableCount = await NativeBridge.getBufferAvailableCount(id);
 
     if (bufferAvailableCount > 0) {
       syncBuffer(lastFrameSynced + 1, bufferAvailableCount);
@@ -283,14 +283,14 @@ class Track {
 
   /// Builds events that can be scheduled in the sequencer engine's event buffer
   /// and adds them to eventsList.
-  void _scheduleEvents(int startFrame, [int maxEventsToSync = BUFFER_SIZE]) {
+  void _scheduleEvents(int startFrame, [int maxEventsToSync = BUFFER_SIZE]) async {
     final isBeforeLoopEnd = sequence.loopState == LoopState.BeforeLoopEnd;
     final loopLength = sequence.getLoopLengthFrames();
     final loopsElapsed = sequence.loopState == LoopState.Off
         ? 0
         : sequence.getLoopsElapsed(startFrame);
 
-    var eventsSyncedCount = _scheduleEventsInRange(
+    var eventsSyncedCount = await _scheduleEventsInRange(
         maxEventsToSync,
         isBeforeLoopEnd ? sequence.getLoopedFrame(startFrame) : startFrame,
         sequence.beatToFrames(
@@ -305,7 +305,7 @@ class Track {
 
       while (eventsSyncedCount < maxEventsToSync) {
         // Schedule all events in one loop range
-        lastBatchCount = _scheduleEventsInRange(
+        lastBatchCount = await _scheduleEventsInRange(
             maxEventsToSync - eventsSyncedCount,
             loopStartFrame,
             loopEndFrame,
@@ -320,8 +320,8 @@ class Track {
 
   /// Schedules this track's events that start on or after startBeat and end
   /// on or before endBeat. Adds frameOffset to every scheduled event.
-  int _scheduleEventsInRange(
-      int maxEventsToSync, int startFrame, int? endFrame, int frameOffset) {
+  Future<int> _scheduleEventsInRange(
+      int maxEventsToSync, int startFrame, int? endFrame, int frameOffset) async {
     final eventsToSync = <SchedulerEvent>[];
 
     for (var eventIndex = 0; eventIndex < events.length; eventIndex++) {
@@ -336,7 +336,7 @@ class Track {
       eventsToSync.add(event);
     }
 
-    final eventsSyncedCount = NativeBridge.scheduleEvents(
+    final eventsSyncedCount = await NativeBridge.scheduleEvents(
         id,
         eventsToSync,
         Sequence.globalState.sampleRate!,

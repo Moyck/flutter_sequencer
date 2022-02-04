@@ -43,6 +43,72 @@ public class SwiftFlutterSequencerPlugin: NSObject, FlutterPlugin {
         } else if (call.method == "addTrackAudioUnit") {
             let audioUnitId = (call.arguments as AnyObject)["id"] as! String
             addTrackAudioUnit(audioUnitId) { result($0) }
+        } else if (call.method == "setupEngine") {
+            let sampleRateCallbackPort = (call.arguments as AnyObject)["sampleRateCallbackPort"] as! Dart_Port
+            setupEngine(sampleRateCallbackPort: sampleRateCallbackPort)
+        } else if (call.method == "destroyEngine") {
+            destroyEngine();
+        } else if (call.method == "addTrackSfz") {
+            let sfzPath = (call.arguments as AnyObject)["sfzPath"] as! String
+            let tuningPath = (call.arguments as AnyObject)["tuningPath"] as! String
+            let callbackPort = (call.arguments as AnyObject)["callbackPort"] as! Dart_Port
+            addTrackSfz(sfzPath: sfzPath, tuningPath: tuningPath, callbackPort: callbackPort)
+        } else if (call.method == "addTrackSfzString") {
+            let sampleRoot = (call.arguments as AnyObject)["sampleRoot"] as! String
+            let sfzString = (call.arguments as AnyObject)["sfzString"] as! String
+            let tuningString = (call.arguments as AnyObject)["tuningString"] as! String
+            let callbackPort = (call.arguments as AnyObject)["callbackPort"] as! Dart_Port
+            addTrackSfzString(sampleRoot: sampleRoot, sfzString: sfzString, tuningString: tuningString, callbackPort: callbackPort);
+        } else if (call.method == "addTrackSf2") {
+            let path = (call.arguments as AnyObject)["path"] as! String
+            let isAsset = (call.arguments as AnyObject)["isAsset"] as! Bool
+            let presetIndex = (call.arguments as AnyObject)["presetIndex"] as! Int32
+            let callbackPort = (call.arguments as AnyObject)["callbackPort"] as! Dart_Port
+            addTrackSf2(path: path, isAsset: isAsset, presetIndex: presetIndex, callbackPort: callbackPort);
+        } else if (call.method == "removeTrack") {
+            let trackIndex = (call.arguments as AnyObject)["trackIndex"] as! track_index_t
+            removeTrack(trackIndex: trackIndex);
+        } else if (call.method == "resetTrack") {
+            let trackIndex = (call.arguments as AnyObject)["trackIndex"] as! track_index_t
+            resetTrack(trackIndex: trackIndex)
+        } else if (call.method == "getPosition") {
+            result(getPosition())
+        } else if (call.method == "getTrackVolume") {
+            let trackIndex = (call.arguments as AnyObject)["trackIndex"] as! track_index_t
+            result(getTrackVolume(trackIndex: trackIndex))
+        } else if (call.method == "getLastRenderTimeUs") {
+            result(getLastRenderTimeUs())
+        } else if (call.method == "getBufferAvailableCount") {
+            let trackIndex = (call.arguments as AnyObject)["trackIndex"] as! track_index_t
+            result(getBufferAvailableCount(trackIndex: trackIndex))
+        } else if (call.method == "handleEventsNow") {
+            let trackIndex = (call.arguments as AnyObject)["trackIndex"] as! track_index_t
+            let uintInt8List = (call.arguments as AnyObject)["eventData"] as! FlutterStandardTypedData
+            let byte = [UInt8](uintInt8List.data)
+            let eventData = UnsafeMutablePointer<UInt8>.allocate(capacity: byte.count)
+            for i in 0..<byte.count {
+                eventData[i] = byte[i]
+            }
+            let eventsCount = (call.arguments as AnyObject)["eventsCount"] as! UInt32
+            handleEventsNow(trackIndex: trackIndex, eventData: eventData, eventsCount: eventsCount);
+        } else if (call.method == "scheduleEvents") {
+            let trackIndex = (call.arguments as AnyObject)["trackIndex"] as! track_index_t
+            let uintInt8List = (call.arguments as AnyObject)["eventData"] as! FlutterStandardTypedData
+            let byte = [UInt8](uintInt8List.data)
+            let eventData = UnsafeMutablePointer<UInt8>.allocate(capacity: byte.count)
+            for i in 0..<byte.count {
+                eventData[i] = byte[i]
+            }
+            let eventsCount = (call.arguments as AnyObject)["eventsCount"] as! UInt32
+            result(scheduleEvents(trackIndex: trackIndex, eventData: eventData, eventsCount: eventsCount))
+        } else if (call.method == "clearEvents") {
+            let trackIndex = (call.arguments as AnyObject)["trackIndex"] as! track_index_t
+            let fromFrame = (call.arguments as AnyObject)["fromFrame"] as! position_frame_t
+            clearEvents(trackIndex: trackIndex, fromFrame: fromFrame)
+        } else if (call.method == "enginePlay") {
+            enginePlay()
+        } else if (call.method == "enginePause") {
+            enginePause();
         }
     }
 }

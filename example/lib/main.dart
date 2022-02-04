@@ -93,13 +93,13 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     });
 
     ticker = this.createTicker((Duration elapsed) {
-      setState(() {
+      setState(() async {
         tempo = sequence.getTempo();
-        position = sequence.getBeat();
+        position = await sequence.getBeat();
         isPlaying = sequence.getIsPlaying();
 
-        tracks.forEach((track) {
-          trackVolumes[track.id] = track.getVolume();
+        tracks.forEach((track) async {
+          trackVolumes[track.id] = await track.getVolume();
         });
       });
     });

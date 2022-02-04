@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
 
@@ -88,7 +89,12 @@ class NativeBridge {
     await _channel.invokeMethod('setupAssetManager');
     nRegisterPostCObject(NativeApi.postCObject);
 
-    return singleResponseFuture<int>((port) => nSetupEngine(port.nativePort));
+    return singleResponseFuture<int>((port) async {
+      final args = <String, dynamic>{
+        'sampleRateCallbackPort': port.nativePort,
+      };
+      return await _channel.invokeMethod('setupEngine', args);
+    });
   }
 
   /// On Android, this will copy the asset dir from the AssetManager into
@@ -114,32 +120,39 @@ class NativeBridge {
 
   static Future<int> addTrackSf2(
       String filename, bool isAsset, int patchNumber) {
-    final filenameUtf8Ptr = filename.toNativeUtf8();
-    return singleResponseFuture<int>((port) => nAddTrackSf2(
-        filenameUtf8Ptr, isAsset ? 1 : 0, patchNumber, port.nativePort));
+    return singleResponseFuture<int>((port) async {
+      final args = <String, dynamic> {
+        'path': filename,
+        'isAsset': isAsset ? 1 : 0,
+        'presetIndex': patchNumber,
+        'callbackPort': port.nativePort,
+      };
+      return await _channel.invokeMethod('addTrackSf2', args);
+    });
   }
 
   static Future<int> addTrackSfz(String sfzPath, String? tuningPath) {
-    final sfzPathUtf8Ptr = sfzPath.toNativeUtf8();
-    final tuningPathUtf8Ptr =
-        tuningPath?.toNativeUtf8() ?? Pointer.fromAddress(0);
-
-    return singleResponseFuture<int>((port) =>
-        nAddTrackSfz(sfzPathUtf8Ptr, tuningPathUtf8Ptr, port.nativePort));
+    return singleResponseFuture<int>((port) async {
+        final args = <String, dynamic> {
+          'sfzPath': sfzPath,
+          'tuningPath': tuningPath ?? Pointer.fromAddress(0).toString(),
+          'callbackPort': port.nativePort,
+        };
+        return await _channel.invokeMethod('addTrackSfz', args);
+    });
   }
 
   static Future<int> addTrackSfzString(
       String sampleRoot, String sfzContent, String? tuningString) {
-    final sampleRootUtf8Ptr = sampleRoot.toNativeUtf8();
-    final sfzContentUtf8Ptr = sfzContent.toNativeUtf8();
-    final tuningStringUtf8Ptr =
-        tuningString?.toNativeUtf8() ?? Pointer.fromAddress(0);
-
-    return singleResponseFuture<int>((port) => nAddTrackSfzString(
-        sampleRootUtf8Ptr,
-        sfzContentUtf8Ptr,
-        tuningStringUtf8Ptr,
-        port.nativePort));
+    return singleResponseFuture<int>((port) async {
+      final args = <String, dynamic> {
+        'sampleRoot': sampleRoot,
+        'sfzString': sfzContent,
+        'tuningString': tuningString ?? Pointer.fromAddress(0).toString(),
+        'callbackPort': port.nativePort,
+      };
+      return await _channel.invokeMethod('addTrackSfzString', args);
+    });
   }
 
   static Future<int?> addTrackAudioUnit(String id) async {
@@ -157,44 +170,58 @@ class NativeBridge {
   }
 
   static void resetTrack(int trackIndex) {
-    nResetTrack(trackIndex);
+    final args = <String, dynamic> {
+      'trackIndex': trackIndex,
+    };
+    _channel.invokeMethod('resetTrack', args);
   }
 
-  static int getPosition() {
-    return nGetPosition();
+  static Future<int> getPosition() async {
+    return await _channel.invokeMethod('getPosition');
   }
 
-  static double getTrackVolume(int trackIndex) {
-    return nGetTrackVolume(trackIndex);
+  static Future<double> getTrackVolume(int trackIndex) async {
+    final args = <String, dynamic>{
+      'trackIndex': trackIndex,
+    };
+    return await _channel.invokeMethod('getTrackVolume', args);
   }
 
-  static int getLastRenderTimeUs() {
-    return nGetLastRenderTimeUs();
+  static Future<int> getLastRenderTimeUs() async {
+    return await _channel.invokeMethod('getLastRenderTimeUs');
   }
 
-  static int getBufferAvailableCount(int trackIndex) {
-    return nGetBufferAvailableCount(trackIndex);
+  static Future<int> getBufferAvailableCount(int trackIndex) async {
+    final args = <String, dynamic> {
+      'trackIndex': trackIndex,
+    };
+    return await _channel.invokeMethod('getBufferAvailableCount', args);
   }
 
-  static int handleEventsNow(int trackIndex, List<SchedulerEvent> events,
-      int sampleRate, double tempo) {
+  static Future<int> handleEventsNow(int trackIndex, List<SchedulerEvent> events,
+      int sampleRate, double tempo) async {
     if (events.isEmpty) return 0;
 
-    final Pointer<Uint8>? nativeArray =
-        calloc<Uint8>(events.length * SCHEDULER_EVENT_SIZE);
+    final Uint8List eventData = Uint8List(events.length * SCHEDULER_EVENT_SIZE);
     events.asMap().forEach((eventIndex, e) {
       final byteData = e.serializeBytes(sampleRate, tempo, 0);
       for (var byteIndex = 0; byteIndex < byteData.lengthInBytes; byteIndex++) {
-        nativeArray![eventIndex * SCHEDULER_EVENT_SIZE + byteIndex] =
+        eventData[eventIndex * SCHEDULER_EVENT_SIZE + byteIndex] =
             byteData.getUint8(byteIndex);
       }
     });
 
-    return nHandleEventsNow(trackIndex, nativeArray, events.length);
+    final args = <String, dynamic> {
+      'trackIndex': trackIndex,
+      'eventData': eventData,
+      'eventsCount': events.length,
+    };
+
+    return await _channel.invokeMethod('handleEventsNow', args);
   }
 
-  static int scheduleEvents(int trackIndex, List<SchedulerEvent> events,
-      int sampleRate, double tempo, int frameOffset) {
+  static Future<int> scheduleEvents(int trackIndex, List<SchedulerEvent> events,
+      int sampleRate, double tempo, int frameOffset) async {
     if (events.isEmpty) return 0;
 
     final Pointer<Uint8>? nativeArray =
@@ -206,19 +233,36 @@ class NativeBridge {
             byteData.getUint8(byteIndex);
       }
     });
+    final Uint8List eventData = Uint8List(events.length * SCHEDULER_EVENT_SIZE);
+    events.asMap().forEach((eventIndex, e) {
+      final byteData = e.serializeBytes(sampleRate, tempo, frameOffset);
+      for (var byteIndex = 0; byteIndex < byteData.lengthInBytes; byteIndex++) {
+        eventData[eventIndex * SCHEDULER_EVENT_SIZE + byteIndex] =
+            byteData.getUint8(byteIndex);
+      }
+    });
 
-    return nScheduleEvents(trackIndex, nativeArray, events.length);
+    final args = <String, dynamic>{
+      'trackIndex': trackIndex,
+      'eventData': eventData,
+      'eventsCount': events.length,
+    };
+    return await _channel.invokeMethod('scheduleEvents', args);
   }
 
   static void clearEvents(int trackIndex, int fromTick) {
-    nClearEvents(trackIndex, fromTick);
+    final args = <String, dynamic>{
+      'trackIndex': trackIndex,
+      'fromFrame': fromTick,
+    };
+    _channel.invokeMethod('clearEvents', args);
   }
 
   static void play() {
-    nPlay();
+    _channel.invokeMethod('enginePlay');
   }
 
   static void pause() {
-    nPause();
+    _channel.invokeMethod('enginePause');
   }
 }

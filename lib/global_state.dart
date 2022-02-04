@@ -68,7 +68,7 @@ class GlobalState {
   }
 
   /// {@macro flutter_sequencer_library_private}
-  void playSequence(int? id) {
+  void playSequence(int? id) async {
     if (!sequenceIdMap.containsKey(id)) return;
     final sequence = sequenceIdMap[id!]!;
     if (sequence.isPlaying || sequence.getIsOver()) return;
@@ -77,7 +77,7 @@ class GlobalState {
 
     sequence.isPlaying = true;
     sequence.engineStartFrame = LEAD_FRAMES +
-        NativeBridge.getPosition() -
+        await NativeBridge.getPosition() -
         sequence.beatToFrames(sequence.pauseBeat);
 
     _syncAllBuffers();
@@ -88,13 +88,13 @@ class GlobalState {
   }
 
   /// {@macro flutter_sequencer_library_private}
-  void pauseSequence(int? id) {
+  void pauseSequence(int? id) async {
     if (!sequenceIdMap.containsKey(id)) return;
     final sequence = sequenceIdMap[id!]!;
     if (!sequence.isPlaying) return;
     final shouldPauseEngine = _getIsPlaying();
 
-    sequence.pauseBeat = sequence.getBeat();
+    sequence.pauseBeat = await sequence.getBeat();
     sequence.isPlaying = false;
 
     if (shouldPauseEngine) {

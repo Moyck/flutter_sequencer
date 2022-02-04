@@ -121,15 +121,15 @@ class Sequence {
   }
 
   /// Sets the tempo.
-  void setTempo(double nextTempo) {
+  void setTempo(double nextTempo) async {
     // Update engine start frame to remove excess loops
     final loopsElapsed = loopState == LoopState.BeforeLoopEnd
-        ? getLoopsElapsed(_getFramesRendered())
+        ? getLoopsElapsed(await _getFramesRendered())
         : 0;
     engineStartFrame += loopsElapsed * getLoopLengthFrames();
 
     // Update engine start frame to adjust to new tempo
-    final framesRendered = _getFramesRendered();
+    final framesRendered = await _getFramesRendered();
     final nextFramesRendered = (framesRendered * (tempo / nextTempo)).round();
     final framesToAdvance = framesRendered - nextFramesRendered;
     engineStartFrame += framesToAdvance;
@@ -142,20 +142,20 @@ class Sequence {
   }
 
   /// Enables looping.
-  void setLoop(double loopStartBeat, double loopEndBeat) {
+  void setLoop(double loopStartBeat, double loopEndBeat) async {
     // If the sequence is over, ensure globalState is updated so the sequence
     // doesn't start playing
     checkIsOver();
 
     // Update engine start frame to remove excess loops
     final loopsElapsed = loopState == LoopState.BeforeLoopEnd
-        ? getLoopsElapsed(_getFramesRendered())
+        ? getLoopsElapsed(await _getFramesRendered())
         : 0;
     engineStartFrame += loopsElapsed * getLoopLengthFrames();
 
     // Update loop state and bounds
     final loopEndFrame = beatToFrames(loopEndBeat);
-    final currentFrame = _getFrame(false);
+    final currentFrame = await _getFrame(false);
 
     if (currentFrame <= loopEndFrame) {
       loopState = LoopState.BeforeLoopEnd;
@@ -170,9 +170,9 @@ class Sequence {
   }
 
   /// Disables looping for the sequence.
-  void unsetLoop() {
+  void unsetLoop() async {
     if (loopState == LoopState.BeforeLoopEnd) {
-      final loopsElapsed = getLoopsElapsed(_getFramesRendered());
+      final loopsElapsed = getLoopsElapsed(await _getFramesRendered());
 
       engineStartFrame += loopsElapsed * getLoopLengthFrames();
     }
@@ -191,7 +191,7 @@ class Sequence {
   }
 
   /// Immediately changes the position of the sequence to the given beat.
-  void setBeat(double beat) {
+  void setBeat(double beat) async {
     if (!globalState.isEngineReady) return;
 
     _tracks.values.forEach((track) {
@@ -199,11 +199,11 @@ class Sequence {
     });
 
     final leadFrames =
-        getIsPlaying() ? min(_getFramesRendered(), LEAD_FRAMES) : 0;
+        getIsPlaying() ? min(await _getFramesRendered(), LEAD_FRAMES) : 0;
 
     final frame = beatToFrames(beat) - leadFrames;
 
-    engineStartFrame = NativeBridge.getPosition() - frame;
+    engineStartFrame = await NativeBridge.getPosition() - frame;
     pauseBeat = beat;
 
     getTracks().forEach((track) {
@@ -231,8 +231,8 @@ class Sequence {
   /// Gets the current beat. Returns a value based on the number of frames
   /// rendered and the time elapsed since the last render callback. To omit
   /// the time elapsed since the last render callback, pass `false`.
-  double getBeat([bool estimateFramesSinceLastRender = true]) {
-    return framesToBeat(_getFrame(estimateFramesSinceLastRender));
+  Future<double> getBeat([bool estimateFramesSinceLastRender = true]) async {
+    return framesToBeat(await _getFrame(estimateFramesSinceLastRender));
   }
 
   /// Gets the current tempo.
@@ -304,19 +304,19 @@ class Sequence {
 
   /// Number of frames elapsed since the sequence was started. Does not account
   /// for the number of loops that may have occurred.
-  int _getFramesRendered() {
+  Future<int> _getFramesRendered() async {
     if (!globalState.isEngineReady) return 0;
 
-    return NativeBridge.getPosition() - engineStartFrame - LEAD_FRAMES;
+    return await NativeBridge.getPosition() - engineStartFrame - LEAD_FRAMES;
   }
 
   /// Gets the current frame position of the sequencer.
-  int _getFrame([bool estimateFramesSinceLastRender = true]) {
+  Future<int> _getFrame([bool estimateFramesSinceLastRender = true]) async {
     if (!globalState.isEngineReady) return 0;
 
     if (isPlaying) {
-      final frame = _getFramesRendered() +
-          (estimateFramesSinceLastRender ? _getFramesSinceLastRender() : 0);
+      final frame = await _getFramesRendered() +
+          (estimateFramesSinceLastRender ? await _getFramesSinceLastRender() : 0);
       final loopedFrame =
           loopState == LoopState.Off ? frame : getLoopedFrame(frame);
 
@@ -328,11 +328,11 @@ class Sequence {
 
   /// Returns the number of frames elapsed since the last audio render callback
   /// was called.
-  int _getFramesSinceLastRender() {
+  Future<int> _getFramesSinceLastRender() async {
     final microsecondsSinceLastRender = max(
         0,
         DateTime.now().microsecondsSinceEpoch -
-            NativeBridge.getLastRenderTimeUs());
+            await NativeBridge.getLastRenderTimeUs());
 
     return globalState.usToFrames(microsecondsSinceLastRender);
   }
