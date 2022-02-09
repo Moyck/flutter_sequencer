@@ -88,10 +88,10 @@ class Sequence {
 
   /// Starts playback of this sequence. If it is already playing, this will have
   /// no effect.
-  void play() {
+  void play() async {
     if (!globalState.isEngineReady) return;
 
-    if (getIsOver()) {
+    if (await getIsOver()) {
       setBeat(0.0);
     }
 
@@ -199,7 +199,7 @@ class Sequence {
     });
 
     final leadFrames =
-        getIsPlaying() ? min(await _getFramesRendered(), LEAD_FRAMES) : 0;
+      await  getIsPlaying() ? min(await _getFramesRendered(), LEAD_FRAMES) : 0;
 
     final frame = beatToFrames(beat) - leadFrames;
 
@@ -219,13 +219,13 @@ class Sequence {
   }
 
   /// Returns true if the sequence is playing.
-  bool getIsPlaying() {
-    return isPlaying && !getIsOver();
+  Future<bool> getIsPlaying() async {
+    return isPlaying && !await getIsOver();
   }
 
   /// Returns true if the sequence is at its end beat.
-  bool getIsOver() {
-    return _getFrame(true) == beatToFrames(endBeat);
+  Future<bool> getIsOver() async{
+    return await _getFrame(true) == beatToFrames(endBeat);
   }
 
   /// Gets the current beat. Returns a value based on the number of frames
@@ -293,8 +293,8 @@ class Sequence {
 
   /// {@macro flutter_sequencer_library_private}
   /// Pauses this sequence if it is at its end.
-  void checkIsOver() {
-    if (isPlaying && getIsOver()) {
+  void checkIsOver() async {
+    if (isPlaying && await getIsOver()) {
       // Sequence is at end, pause
 
       pauseBeat = endBeat;

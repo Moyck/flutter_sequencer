@@ -71,7 +71,7 @@ class GlobalState {
   void playSequence(int? id) async {
     if (!sequenceIdMap.containsKey(id)) return;
     final sequence = sequenceIdMap[id!]!;
-    if (sequence.isPlaying || sequence.getIsOver()) return;
+    if (sequence.isPlaying || await sequence.getIsOver()) return;
 
     final shouldPlayEngine = !_getIsPlaying();
 
